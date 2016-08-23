@@ -19,41 +19,13 @@
 #define DBG(message, tResult) printf("Line%d, %s)%s returned 0x%08x. %s.\n", __LINE__, __func__, message, tResult, (char *)Trspi_Error_String(tResult))
 
 
-void HashThis(TSS_HCONTEXT hContext, BYTE *pubKey, UINT32 pubKeysize, BYTE hash[20]){
-	TSS_RESULT result;
-	BYTE *digest;
-	UINT32 digestLen;
-	TSS_HHASH hHashOfESSKey;
-	BYTE initialHash[20];
-	memset(initialHash,0,20);
-	// Create a generic Hash object
-	result=Tspi_Context_CreateObject(hContext, TSS_OBJECT_TYPE_HASH, TSS_HASH_SHA1, &hHashOfESSKey);
-	DBG("Create Hash object", result);
-	// Hash the data using SHA1
-	result=Tspi_Hash_UpdateHashValue(hHashOfESSKey, pubKeysize, pubKey);
-	DBG("Hash in the public key", result);
-	result=Tspi_Hash_GetHashValue(hHashOfESSKey, &digestLen, &digest);
-	DBG("Get the hashed result", result);
-	// so now the digest has the hash of the ESS public key in it
-	memcpy(hash,digest,20);
-}
-
-long getFileSize(char *filePath){
-	long siz = 0;
-	FILE *fp = fopen(filePath, "rb");
-	if(fp){
-		fseek(fp, 0, SEEK_END);
-		siz = ftell(fp);	
-	}
-	fclose(fp);
-	return siz;
-}
-
-
-void readFile(char *filePath, long fileSize, BYTE *s){	
-	FILE *fp = fopen(filePath, "rb");
-	fread(s, sizeof(BYTE), fileSize, fp);
-	fclose(fp);
+void printMenu()
+{
+	printf("\nChangePCRn Help Menu:\n");
+	printf("\t-p PCR register to extend (0-23)\n");
+	printf("\t-v value to be extended into PCR(abc..)\n");
+	printf("\tNote: -v argument is optional and a default value will be used if no value is provided\n");
+	printf("\tExample: ChangePCRn -p 10 -v abcdef\n");
 }
 
 int main(int argc, char **argv)
@@ -81,18 +53,44 @@ int main(int argc, char **argv)
 	result=Tspi_Policy_SetSecret(hSRKPolicy,TSS_SECRET_MODE_SHA1,20, wks); 
 	// Note: TSS_SECRET_MODE_SHA1 says “Don’t hash this. Just use the 20 bytes as is.
 	//-----------------
-	int i;
-	char *filePath = "/home/yg115/test/testForSysdig/trace.scap72";
-	long size = getFileSize(filePath);
-	BYTE s[size];
-	readFile(filePath, size, s);
 
-	BYTE hash[20];
-	HashThis(hContext, &s, size, &hash);
-
-	for(i=0 ; i<19;++i){
-		printf("%02x",*(hash+i));
+	UINT32 PCR_result_length;
+	BYTE *Final_PCR_Value;
+	BYTE valueToExtend[250];
+	int count = 0;
+	int pcrToExtend = 0;
+	memset(valueToExtend,0,250);
+	// Display each command line argument.
+	printf("\n Command line arguments:\n");
+	for(count = 0; count < argc; count++){
+		printf(" argv[%d] %s\n", count, argv[count]);
 	}
+	// Examine command line arguments.
+	if(argc >= 3){
+		if(strcmp(argv[1],"-p") == 0){
+			pcrToExtend = atoi(argv[2]);
+			if(pcrToExtend < 0 || pcrToExtend > 23){
+				printMenu();
+				return 0;
+			}
+			if(argc == 5){
+				if(strcmp(argv[3], "-v") == 0){
+					memcpy(valueToExtend, argv[4], strlen(argv[4]));
+				}
+			}else{
+				//use default value
+				memcpy(valueToExtend, "abcdefghijklmnopqrst", 20);
+			}
+		}		
+	}else{
+		printMenu();
+		return 0;
+	}
+	result = Tspi_TPM_PcrExtend(hTPM, pcrToExtend, 20, (BYTE *)valueToExtend, NULL, &PCR_result_length, &Final_PCR_Value);
+	DBG("Extended the PCR", result);
+
+
+
 
 	//-----Postlude
 	Tspi_Context_Close(hContext);

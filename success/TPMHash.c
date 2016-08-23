@@ -38,24 +38,6 @@ void HashThis(TSS_HCONTEXT hContext, BYTE *pubKey, UINT32 pubKeysize, BYTE hash[
 	memcpy(hash,digest,20);
 }
 
-long getFileSize(char *filePath){
-	long siz = 0;
-	FILE *fp = fopen(filePath, "rb");
-	if(fp){
-		fseek(fp, 0, SEEK_END);
-		siz = ftell(fp);	
-	}
-	fclose(fp);
-	return siz;
-}
-
-
-void readFile(char *filePath, long fileSize, BYTE *s){	
-	FILE *fp = fopen(filePath, "rb");
-	fread(s, sizeof(BYTE), fileSize, fp);
-	fclose(fp);
-}
-
 int main(int argc, char **argv)
 {
 	//-----Preamble
@@ -81,15 +63,12 @@ int main(int argc, char **argv)
 	result=Tspi_Policy_SetSecret(hSRKPolicy,TSS_SECRET_MODE_SHA1,20, wks); 
 	// Note: TSS_SECRET_MODE_SHA1 says “Don’t hash this. Just use the 20 bytes as is.
 	//-----------------
-	int i;
-	char *filePath = "/home/yg115/test/testForSysdig/trace.scap72";
-	long size = getFileSize(filePath);
-	BYTE s[size];
-	readFile(filePath, size, s);
 
+	BYTE hasht[10] = "1234";
 	BYTE hash[20];
-	HashThis(hContext, &s, size, &hash);
-
+	int i;
+	HashThis(hContext, &hasht, 10, &hash);
+	//printf("\nChangePCRn Help Menu:\n");
 	for(i=0 ; i<19;++i){
 		printf("%02x",*(hash+i));
 	}
