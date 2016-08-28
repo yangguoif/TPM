@@ -21,8 +21,6 @@ void extendPCR(TSS_HCONTEXT hContext, int pcrToExtend, BYTE *valueToExtend)
 {
 	TSS_HTPM hTPM = 0;
 	TSS_RESULT result;
-	//Use hContext coming in to create new context
-	result = Tspi_Context_Create(&hContext);
 	result = Tspi_Context_Connect(hContext, NULL);
 	// Get the TPM handle
 	result=Tspi_Context_GetTpmObject(hContext, &hTPM); 
@@ -44,6 +42,32 @@ void resetPCR(TSS_HCONTEXT hContext, int pcrToReset)
 	result = Tspi_PcrComposite_SelectPcrIndex(hPcrs, pcrToReset);
 	result = Tspi_TPM_PcrReset(hTPM, hPcrs);
 	DBG("Reset the PCR", result);
+}
+
+void readPCR(TSS_HCONTEXT hContext, UINT32 pcrToRead, BYTE pcrValue[20]){
+	BYTE *digest;
+	TSS_RESULT result;
+	TSS_HTPM hTPM = 0;
+	// Pick the TPM you are talking to in this case the system TPM (which you connect to with “NULL”)
+	result = Tspi_Context_Connect(hContext, NULL);
+	// Get the TPM handle
+	result=Tspi_Context_GetTpmObject(hContext, &hTPM);
+	BYTE *rgbPcrValue;
+	UINT32 ulPcrValueLength=20;
+	int i, j;
+//	this is for reading all the PCRs
+	for(j=0; j<24; ++j){
+		result = Tspi_TPM_PcrRead(hTPM, j, &ulPcrValueLength, &rgbPcrValue);
+		printf("PCR %02d",j);
+		for(i=0 ; i<19;++i){
+			printf("%02x",*(rgbPcrValue+i));
+		}
+		printf("\n");
+	}
+
+	result = Tspi_TPM_PcrRead(hTPM, pcrToRead, &ulPcrValueLength, &digest);
+	memcpy(pcrValue,digest,20);
+	DBG("Read the PCR", result);
 }
 
 //hash an array of BYTE (which is the file which is gonna be hashed). 
@@ -85,8 +109,6 @@ void readFile(char *filePath, long fileSize, BYTE *s){
 	fclose(fp);
 }
 
-
-
 int main(int argc, char **argv)
 {
 	//-----Preamble
@@ -113,12 +135,13 @@ int main(int argc, char **argv)
 	// Note: TSS_SECRET_MODE_SHA1 says “Don’t hash this. Just use the 20 bytes as is.
 	//-----------------
 	
-	int i;
+	int i;	//an int for controling for loop
 	char *filePath = "/home/yg115/test/testForSysdig/trace.scap71";
 	long size = getFileSize(filePath);
-	BYTE s[size];
+	BYTE s[size];	//an BYTE array to store the content of file
 	readFile(filePath, size, s);
-	BYTE hash[20];
+	BYTE hash[20];	//an BYTE array to store the hash result of the content in BYTE s[]
+	BYTE pcrValue[20];	//an BYTE array to store the pcr value read out from a PCR by readPCR()
 	HashThis(hContext, &s, size, &hash);
 
 	for(i=0 ; i<19;++i){	//print the hash value
@@ -127,7 +150,16 @@ int main(int argc, char **argv)
 	printf("\n");
 
 	resetPCR(hContext, 23);
-	extendPCR(hContext, 23, hash);
+	extendPCR(hContext, 14, hash);
+	readPCR(hContext, 22, pcrValue);
+	
+	//-------------------print the pcr value read out by readPCR()
+	printf("PCR %02d : ", 23);
+	for(i=0 ; i<19;++i){
+		printf("%02x",*(pcrValue+i));
+	}
+	printf("\n");
+	//--------------------------------------------------
 
 	//-----Postlude
 	Tspi_Context_Close(hContext);
