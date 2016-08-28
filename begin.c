@@ -55,6 +55,7 @@ void readPCR(TSS_HCONTEXT hContext, UINT32 pcrToRead, BYTE pcrValue[20]){
 	BYTE *rgbPcrValue;
 	UINT32 ulPcrValueLength=20;
 	int i, j;
+
 //	this is for reading all the PCRs
 	for(j=0; j<24; ++j){
 		result = Tspi_TPM_PcrRead(hTPM, j, &ulPcrValueLength, &rgbPcrValue);
@@ -136,23 +137,47 @@ int main(int argc, char **argv)
 	//-----------------
 	
 	int i;	//an int for controling for loop
+	int changeFlag = 1;	//flag for comparison of PCR16 and PCR23
 	char *filePath = "/home/yg115/test/testForSysdig/trace.scap71";
 	long size = getFileSize(filePath);
 	BYTE s[size];	//an BYTE array to store the content of file
+	long size1;	//for test loop	
+	BYTE s1[size];	//for test loop
 	readFile(filePath, size, s);
 	BYTE hash[20];	//an BYTE array to store the hash result of the content in BYTE s[]
+	BYTE hash1[20];	//for test loop
 	BYTE pcrValue[20];	//an BYTE array to store the pcr value read out from a PCR by readPCR()
+	BYTE pcrValue1[20];	//for the test loop PCR
 	HashThis(hContext, &s, size, &hash);
 
+	
 	for(i=0 ; i<19;++i){	//print the hash value
 		printf("%02x",*(hash+i));
 	}
 	printf("\n");
 
 	resetPCR(hContext, 23);
-	extendPCR(hContext, 14, hash);
-	readPCR(hContext, 22, pcrValue);
-	
+	extendPCR(hContext, 23, hash);
+	readPCR(hContext, 23, pcrValue);	
+
+	while(1){
+		size1 = getFileSize(filePath);
+		readFile(filePath, size1, s1);
+		HashThis(hContext, &s1, size1, &hash1);
+
+		resetPCR(hContext, 16);
+		extendPCR(hContext, 16, hash1);
+		readPCR(hContext, 16, pcrValue1);
+		i = memcmp(pcrValue, pcrValue1, 20);
+		changeFlag = memcmp(pcrValue, pcrValue1, 20);
+		if(changeFlag != 0){
+			printf("changed");
+			break;
+		}
+	}
+
+
+/*	
 	//-------------------print the pcr value read out by readPCR()
 	printf("PCR %02d : ", 23);
 	for(i=0 ; i<19;++i){
@@ -160,7 +185,7 @@ int main(int argc, char **argv)
 	}
 	printf("\n");
 	//--------------------------------------------------
-
+*/
 	//-----Postlude
 	Tspi_Context_Close(hContext);
 	Tspi_Context_FreeMemory(hContext, NULL);
