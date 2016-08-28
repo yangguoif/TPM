@@ -14,7 +14,9 @@
 
 #define DBG(message, tResult) printf("Line%d, %s)%s returned 0x%08x. %s.\n", __LINE__, __func__, message, tResult, (char *)Trspi_Error_String(tResult))
 
-
+//extend a PCR's value
+//int pcrToExtend: the PCR number which is gonna be extend
+//BYTE *valueToExtend: the value used to extend, in this program, it is the hash value of the hashed file
 void extendPCR(TSS_HCONTEXT hContext, int pcrToExtend, BYTE *valueToExtend)
 {
 	TSS_HTPM hTPM = 0;
@@ -30,6 +32,8 @@ void extendPCR(TSS_HCONTEXT hContext, int pcrToExtend, BYTE *valueToExtend)
 	DBG("Extended the PCR", result);
 }
 
+//reset a PCR to default value
+//int pcrToReset: the PCR number which is going to be reset
 void resetPCR(TSS_HCONTEXT hContext, int pcrToReset)
 {	
 	TSS_HTPM hTPM = 0;
@@ -42,7 +46,9 @@ void resetPCR(TSS_HCONTEXT hContext, int pcrToReset)
 	DBG("Reset the PCR", result);
 }
 
-
+//hash an array of BYTE (which is the file which is gonna be hashed). 
+//BYTE *content: the array of BYTE which is gonna be hashed
+//BYTE hash[20]: the hash result
 void HashThis(TSS_HCONTEXT hContext, BYTE *content, UINT32 contentSize, BYTE hash[20]){
 	TSS_RESULT result;
 	BYTE *digest;
@@ -59,7 +65,8 @@ void HashThis(TSS_HCONTEXT hContext, BYTE *content, UINT32 contentSize, BYTE has
 	memcpy(hash,digest,20);
 }
 
-long getFileSize(char *filePath){	//get the size of the file which is gonna be hashed, in BYTE.
+//get the size of the file which is gonna be hashed, in BYTE.
+long getFileSize(char *filePath){
 	long siz = 0;
 	FILE *fp = fopen(filePath, "rb");
 	if(fp){
@@ -70,11 +77,15 @@ long getFileSize(char *filePath){	//get the size of the file which is gonna be h
 	return siz;
 }
 
-void readFile(char *filePath, long fileSize, BYTE *s){		//read the file which is gonna be hashed BYTE by BYTE
+//read the file which is gonna be hashed BYTE by BYTE
+//BYTE *s: the target BYTE array to store the content of being read
+void readFile(char *filePath, long fileSize, BYTE *s){
 	FILE *fp = fopen(filePath, "rb");
 	fread(s, sizeof(BYTE), fileSize, fp);
 	fclose(fp);
 }
+
+
 
 int main(int argc, char **argv)
 {
