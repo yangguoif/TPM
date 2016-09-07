@@ -4,6 +4,10 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include <bson.h>
+#include <bcon.h>
+#include <mongoc.h>
+
 #include <tss/tss_error.h>
 #include <tss/platform.h>
 #include <tss/tss_defines.h>
@@ -23,6 +27,9 @@ void readFile(char *filePath, long fileSize, BYTE *s){
 }
 */
 
+//hash an array of BYTE (which is the file which is gonna be hashed). 
+//BYTE *content: the array of BYTE which is gonna be hashed
+//BYTE hash[20]: the hash result
 void HashThis(TSS_HCONTEXT hContext, BYTE *content, UINT32 contentSize, BYTE hash[20]){
 	TSS_RESULT result;
 	BYTE *digest;
@@ -40,7 +47,7 @@ void HashThis(TSS_HCONTEXT hContext, BYTE *content, UINT32 contentSize, BYTE has
 }
 
 void main(int argc, char **argv){
-	//-----Preamble
+	//----------------Preamble, initializing TPM chip
 	TSS_HCONTEXT hContext=0;
 	TSS_HTPM hTPM = 0;
 	TSS_RESULT result;
@@ -62,14 +69,30 @@ void main(int argc, char **argv){
 	//Set the SRK policy to be the well known secret
 	result=Tspi_Policy_SetSecret(hSRKPolicy,TSS_SECRET_MODE_SHA1,20, wks); 
 	// Note: TSS_SECRET_MODE_SHA1 says “Don’t hash this. Just use the 20 bytes as is.
-	//-----------------
+	//-----------------initializing TPM ends
+
+	//-----------------initializing MongoDB connection
+	mongoc_client_t *client;
+  	mongoc_database_t *database;
+   	mongoc_collection_t *collection;
+   	bson_t *command, reply, *insert;
+   	bson_error_t error;
+   	char *str;
+   	bool retval;
+   	mongoc_init ();	//initialize libmongoc's internals
+	client = mongoc_client_new ("mongodb://localhost:27017");	//Create a new client instance
+   	database = mongoc_client_get_database (client, "logHash");
+   	collection = mongoc_client_get_collection (client, "logHash", "testHash");	//Get a handle on the database
+	//-----------------initializing MongoDB ends
 
 	char *inputFilePath = "/home/yg115/test/testForSysdig/trace.scap71";
 	char *outputFilePath[80];	//output file path for the content in buffer, the new
 							//file will be created and the fileNum will be added at the back
-	int i;	
+	int i;
+	char *jsonForDB = "";	
 	BYTE bufferHash[20];
-	int fileNum = 1;
+	char *hashForDB = "";
+	int fileNum = 1;	//number flag for log file name, used for strcat()
 	char stringNum[25];
 	BYTE buffer[BUFFERSIZE];
 	FILE *fp = fopen(inputFilePath, "rb");
@@ -79,16 +102,27 @@ void main(int argc, char **argv){
 		fread(buffer, sizeof(buffer), 1, fp);
 		HashThis(hContext, &buffer, BUFFERSIZE, &bufferHash);
 		snprintf(stringNum, 25, "%d", fileNum);	//change fileNum(int) to char for strcat()
+				
 		fileNum++;
 		strcat(outputFilePath, "/home/yg115/test/generatedFile/log");
 		strcat(outputFilePath, stringNum);
 		FILE *fpo = fopen(outputFilePath, "wb");
-		fwrite(buffer, sizeof(buffer), 1, fpo);
+
+		fwrite(buffer, sizeof(buffer), 1, fpo);	//write buffer into a log file
 		fflush(fpo);
 		fclose(fpo);
+		printf("gethere\n");
 		for(i=0 ; i<19;++i){	//print the hash value
+			strcat(hashForDB, *(bufferHash+i));				
 			printf("%02x",*(bufferHash+i));
 		}
+		
+		strcat(jsonForDB, "{\"fileName\":\"");
+		strcat(jsonForDB, outputFilePath);
+		strcat(jsonForDB, "\", \"hashValue\":\"");
+		strcat(jsonForDB, hashForDB);
+		strcat(jsonForDB, "\"}");
+		printf("%s", jsonForDB);
 	}
 
 }
