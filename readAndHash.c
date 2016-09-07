@@ -104,7 +104,7 @@ void main(int argc, char **argv){
 		snprintf(stringNum, 25, "%d", fileNum);	//change fileNum(int) to char for strcat()
 				
 		fileNum++;
-		strcat(outputFilePath, "/home/yg115/test/generatedFile/log");
+		strcat(outputFilePath, "/home/yg115/test/generatedFile/");
 		strcat(outputFilePath, stringNum);
 		FILE *fpo = fopen(outputFilePath, "wb");
 
