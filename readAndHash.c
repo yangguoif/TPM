@@ -17,7 +17,7 @@
 #include <trousers/trousers.h>
 
 #define DBG(message, tResult) printf("Line%d, %s)%s returned 0x%08x. %s.\n", __LINE__, __func__, message, tResult, (char *)Trspi_Error_String(tResult))
-#define BUFFERSIZE 1024
+#define BUFFERSIZE 20
 
 /*
 void readFile(char *filePath, long fileSize, BYTE *s){
@@ -86,13 +86,13 @@ void main(int argc, char **argv){
 	//-----------------initializing MongoDB ends
 
 	char *inputFilePath = "/home/yg115/test/testForSysdig/trace.scap71";
-	char *outputFilePath[80];	//output file path for the content in buffer, the new
+	char outputFilePath[80];	//output file path for the content in buffer, the new
 							//file will be created and the fileNum will be added at the back
 	int i;
-	char *jsonForDB = "";	//help to organize json format for storing hash value into DB
+	char jsonForDB[200];	//help to organize json format for storing hash value into DB
 	BYTE buffer[BUFFERSIZE];	//buffer for the content read from streaming data and going to write into log file
 	BYTE bufferHash[20];	//buffer for hash value of the content in BYTE buffer
-	char *hashForDB = "";	//help to convert *BYTE to *char
+	char hashForDB[20];	//help to convert *BYTE to *char
 	int fileNum = 1;	//number flag for log file name, used for strcat()
 	char stringNum[25];	//help to convert int to *char
 	
@@ -101,35 +101,41 @@ void main(int argc, char **argv){
 		printf("failed to setup buffer for input file");
 	else{
 		while(feof != 1){
+			memset(bufferHash, 0, BUFFERSIZE);
 			fread(buffer, sizeof(buffer), 1, fp);
-			HashThis(hContext, &buffer, BUFFERSIZE, &bufferHash);	
-			snprintf(stringNum, 25, "%d", fileNum);	//change fileNum(int) to char for strcat()
-			printf("gethere1 \n");
+			memset(bufferHash, 0, 20);
+			HashThis(hContext, &buffer, BUFFERSIZE, &bufferHash);
+
+			snprintf(stringNum, 25, "%d", fileNum);	//generate outputFilePath
 			fileNum++;
 			memset(outputFilePath, 0, sizeof(outputFilePath)/sizeof(char));
 			strcat(outputFilePath, "/home/yg115/test/generatedFile/");
 			strcat(outputFilePath, stringNum);
 		
 			FILE *fpo = fopen(outputFilePath, "wb");
-			printf("%s \n", outputFilePath);
-			size_t ret = fwrite(buffer, sizeof(BYTE), sizeof(buffer), fpo);
-			printf("test Segment 2 %d \n", ret);
+			size_t ret = fwrite(buffer, sizeof(BYTE), sizeof(buffer), fpo);	//write content in buffer into file
 			fflush(fpo);
-			fclose(fpo);
-			for(i=0 ; i<19;++i){	//print the hash value
+			fclose(fpo);	
+
+			memset(hashForDB, 0, 20);
+			printf("\n bufferHash value: ");
+			for(i=0 ; i<19;++i){	//copy the hash value the the *char for json, and print the hash value
+				char jj[2];
+				sprintf(jj, "%02x", *(bufferHash+i));
+				strcat(hashForDB, jj);					
 				printf("%02x",*(bufferHash+i));
 			}
 			printf("\n");
-			printf("gethere2 \n");
-/*
-			strcat(jsonForDB, "{\"fileName\":\"");
+
+			memset(jsonForDB, 0, sizeof(jsonForDB)/sizeof(jsonForDB));	//organizing Json format to convert to
+			strcat(jsonForDB, "{\"fileName\":\"");				//BSON for DB writing
 			strcat(jsonForDB, outputFilePath);
 			strcat(jsonForDB, "\", \"hashValue\":\"");
 			strcat(jsonForDB, hashForDB);
 			strcat(jsonForDB, "\"}");
-			printf("%s", jsonForDB);
-*/
+			printf("Json: %s \n", jsonForDB);
+
 		}
 	}
-
+	fclose(inputFilePath);
 }
