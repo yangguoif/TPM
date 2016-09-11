@@ -82,7 +82,7 @@ int main(int argc, char **argv)
 	// Note: TSS_SECRET_MODE_SHA1 says “Don’t hash this. Just use the 20 bytes as is.
 	//-----------------
 	int i;
-	char *filePath = "/home/yg115/test/testForSysdig/trace.scap72";
+	char *filePath = "/home/yg115/test/generatedFile/3849";
 	long size = getFileSize(filePath);
 	BYTE s[size];
 	readFile(filePath, size, s);
