@@ -1,8 +1,11 @@
+#define __USE_C99_MATH
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/shm.h>
 
 #include <tss/tss_error.h>
 #include <tss/platform.h>
@@ -55,7 +58,7 @@ void readPCR(TSS_HCONTEXT hContext, UINT32 pcrToRead, BYTE pcrValue[20]){
 	BYTE *rgbPcrValue;
 	UINT32 ulPcrValueLength=20;
 	int i, j;
-
+/*
 //	this is for reading all the PCRs
 	for(j=0; j<24; ++j){
 		result = Tspi_TPM_PcrRead(hTPM, j, &ulPcrValueLength, &rgbPcrValue);
@@ -65,7 +68,7 @@ void readPCR(TSS_HCONTEXT hContext, UINT32 pcrToRead, BYTE pcrValue[20]){
 		}
 		printf("\n");
 	}
-
+*/
 	result = Tspi_TPM_PcrRead(hTPM, pcrToRead, &ulPcrValueLength, &digest);
 	memcpy(pcrValue,digest,20);
 	DBG("Read the PCR", result);
@@ -136,6 +139,27 @@ int main(int argc, char **argv)
 	// Note: TSS_SECRET_MODE_SHA1 says “Don’t hash this. Just use the 20 bytes as is.
 	//-----------------
 	
+	//-----------------initializing shared memory for the communication between check code and this code
+	void *shm = NULL;	//the first memory address in this code for shared memory
+	int shmid;	//shared memory id
+	bool *checkFlag = NULL;	//a ptr point to the boolean value stored in the shared memory
+	shmid = shmget((key_t)1234, sizeof(checkFlag), 0666|IPC_CREAT);
+	if(shmid == -1)	//initializing sccuess?
+    	{  
+        	fprintf(stderr, "shmget failed\n");  
+        	exit(EXIT_FAILURE);  
+    	}
+	shm = shmat(shmid, 0, 0);  //match shared memory to current process
+	if(shm == (void*)-1)  
+	{  
+		fprintf(stderr, "shmat failed\n");  
+		exit(EXIT_FAILURE);  
+	}  
+	printf("\nMemory attached at %X\n", (int)shm); 
+	checkFlag = (bool*) shm;
+
+	//-----------------initializing shared memory ends
+
 	int i;	//an int for controling for loop
 	int changeFlag = 1;	//flag for comparison of PCR16 and PCR23
 	char *filePath = "/home/yg115/test/testForSysdig/trace.scap71";
@@ -150,12 +174,12 @@ int main(int argc, char **argv)
 	BYTE pcrValue1[20];	//for the test loop PCR
 	HashThis(hContext, &s, size, &hash);
 
-	
+/*	
 	for(i=0 ; i<19;++i){	//print the hash value
 		printf("%02x",*(hash+i));
 	}
 	printf("\n");
-
+*/
 	resetPCR(hContext, 23);
 	extendPCR(hContext, 23, hash);
 	readPCR(hContext, 23, pcrValue);	
@@ -174,6 +198,14 @@ int main(int argc, char **argv)
 			printf("changed");
 			break;
 		}
+		
+		printf("out of if....%d\n", *checkFlag);
+		if(*checkFlag == true){
+			printf("in if.....%d\n", *checkFlag);
+			*checkFlag = false;
+		}
+		
+		
 	}
 
 	//-----Postlude
@@ -182,5 +214,10 @@ int main(int argc, char **argv)
 	// this frees memory that was automatically allocated for you
 	Tspi_Context_Close(hContext);
 	//-----------	
+	if(shmdt(shm) == -1)	//delete shared memory from current process
+    	{  
+        	fprintf(stderr, "shmdt failed\n");  
+        	exit(EXIT_FAILURE);  
+    	} 
 	return 0;
 }

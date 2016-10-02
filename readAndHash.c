@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/shm.h>
 
 #include <bson.h>
 #include <bcon.h>
@@ -85,6 +86,27 @@ void main(int argc, char **argv){
    	collection = mongoc_client_get_collection (client, "logHash", "testHash");	//Get a handle on the database
 	//-----------------initializing MongoDB ends
 
+	//-----------------initializing shared memory for the communication between check code and this code
+	void *shm = NULL;	//the first memory address in this code for shared memory
+	int shmid;	//shared memory id
+	bool *restartCheck = NULL;	//a ptr point to the boolean value stored in the shared memory
+	shmid = shmget((key_t)1234, sizeof(restartCheck), 0666|IPC_CREAT);
+	if(shmid == -1)	//initializing sccuess?
+    	{  
+        	fprintf(stderr, "shmget failed\n");  
+        	exit(EXIT_FAILURE);  
+    	}
+	shm = shmat(shmid, 0, 0);  //match shared memory to current process
+	if(shm == (void*)-1)  
+	{  
+		fprintf(stderr, "shmat failed\n");  
+		exit(EXIT_FAILURE);  
+	}  
+	printf("\nMemory attached at %X\n", (int)shm); 
+	restartCheck = (bool*) shm;
+
+	//-----------------initializing shared memory ends
+
 	char *inputFilePath = "/home/yg115/test/testForSysdig/trace.scap71";
 	char outputFilePath[80];	//output file path for the content in buffer, the new
 							//file will be created and the fileNum will be added at the back
@@ -139,12 +161,25 @@ void main(int argc, char **argv){
 			if (!mongoc_collection_insert (collection, MONGOC_INSERT_NONE, insert, NULL, &error)) {
         			fprintf (stderr, "%s\n", error.message);
     			}
+			
+			*restartCheck = true;	//set shared memory, restart check in the check process
 
 		}
 	}
 	bson_destroy (insert);
-   	mongoc_collection_destroy (collection);
+   	mongoc_collection_destroy (collection);	//destroy mongodb connection
     	mongoc_client_destroy (client);
     	mongoc_cleanup ();
-	fclose(inputFilePath);
+	fclose(inputFilePath);	//close file (data resource, should be TCP connection)  
+   	if(shmdt(shm) == -1)	//delete shared memory from current process
+    	{  
+        	fprintf(stderr, "shmdt failed\n");  
+        	exit(EXIT_FAILURE);  
+    	} 
+    	if(shmctl(shmid, IPC_RMID, 0) == -1)	//delete shared memory
+    	{  
+        	fprintf(stderr, "shmctl(IPC_RMID) failed\n");  
+        	exit(EXIT_FAILURE);  
+    	}  
+	
 }
