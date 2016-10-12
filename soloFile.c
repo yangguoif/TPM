@@ -6,6 +6,9 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/shm.h>
+#include <dirent.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 #include <tss/tss_error.h>
 #include <tss/platform.h>
@@ -16,6 +19,8 @@
 #include <trousers/trousers.h>
 
 #define DBG(message, tResult) printf("Line%d, %s)%s returned 0x%08x. %s.\n", __LINE__, __func__, message, tResult, (char *)Trspi_Error_String(tResult))
+
+#define WRITEPATH /home/yg115/test/generatedFile/
 
 //extend a PCR's value
 //int pcrToExtend: the PCR number which is gonna be extend
@@ -174,6 +179,10 @@ int main(int argc, char **argv)
 	BYTE pcrValue1[20];	//for the test loop PCR
 	HashThis(hContext, &s, size, &hash);
 
+	DIR *pDir;
+	struct dirent* ent = NULL;
+ 	char dir[512]; 
+	
 /*	
 	for(i=0 ; i<19;++i){	//print the hash value
 		printf("%02x",*(hash+i));
@@ -185,6 +194,20 @@ int main(int argc, char **argv)
 	readPCR(hContext, 23, pcrValue);	
 
 	while(1){
+/*		
+		if ((pDir = opendir(WRITEPATH)) == NULL)  
+    		{  
+       			fprintf("Cannot open directory:%s\n", path);  
+        		return NULL;  
+    		}
+		while ((ent = readdir(pDir)) != NULL)  
+    		{ 
+        		snprintf(dir, 512, "%s/%s", path, ent->d_name);	//get file name  
+        		 
+    		}
+
+*/
+
 		size1 = getFileSize(filePath);
 		readFile(filePath, size1, s1);
 		HashThis(hContext, &s1, size1, &hash1);
