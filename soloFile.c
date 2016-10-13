@@ -20,7 +20,7 @@
 
 #define DBG(message, tResult) printf("Line%d, %s)%s returned 0x%08x. %s.\n", __LINE__, __func__, message, tResult, (char *)Trspi_Error_String(tResult))
 
-#define WRITEPATH /home/yg115/test/generatedFile/
+//#define path /home/yg115/test/generatedFile/
 
 //extend a PCR's value
 //int pcrToExtend: the PCR number which is gonna be extend
@@ -63,17 +63,6 @@ void readPCR(TSS_HCONTEXT hContext, UINT32 pcrToRead, BYTE pcrValue[20]){
 	BYTE *rgbPcrValue;
 	UINT32 ulPcrValueLength=20;
 	int i, j;
-/*
-//	this is for reading all the PCRs
-	for(j=0; j<24; ++j){
-		result = Tspi_TPM_PcrRead(hTPM, j, &ulPcrValueLength, &rgbPcrValue);
-		printf("PCR %02d",j);
-		for(i=0 ; i<19;++i){
-			printf("%02x",*(rgbPcrValue+i));
-		}
-		printf("\n");
-	}
-*/
 	result = Tspi_TPM_PcrRead(hTPM, pcrToRead, &ulPcrValueLength, &digest);
 	memcpy(pcrValue,digest,20);
 	DBG("Read the PCR", result);
@@ -108,6 +97,73 @@ long getFileSize(char *filePath){
 	}
 	fclose(fp);
 	return siz;
+}
+
+char** getFileNameArray(const char *path, int *fileCount)  
+{  
+    int count = 0;  
+    char **fileNameList = NULL;  
+    struct dirent* ent = NULL;  
+    DIR *pDir;  
+    char dir[512];  
+    struct stat statbuf;  
+  
+    if ((pDir = opendir(path)) == NULL)  
+    {  
+        printf("Cannot open directory:%s\n", path);  
+        return NULL;  
+    }  
+    while ((ent = readdir(pDir)) != NULL)  
+    {
+        snprintf(dir, 512, "%s/%s", path, ent->d_name);  
+        lstat(dir, &statbuf);    
+        if (!S_ISDIR(statbuf.st_mode))  
+        {  
+            count++;  
+        }  
+    }   
+    closedir(pDir);
+
+ 	
+	
+    if ((fileNameList = (char**) malloc(sizeof(char*) * count)) == NULL)  
+    {  
+        printf("Malloc heap failed!\n");  
+        return NULL;  
+    }  
+
+    if ((pDir = opendir(path)) == NULL)  
+    {  
+        printf("Cannot open directory:%s\n", path);  
+        return NULL;  
+    }  
+ 
+    int i;  
+    for (i = 0; (ent = readdir(pDir)) != NULL && i < count;)  
+    {  
+        if (strlen(ent->d_name) <= 0)  
+        {  
+            continue;  
+        }   
+        snprintf(dir, 512, "%s/%s", path, ent->d_name);    
+        lstat(dir, &statbuf);   
+        if (!S_ISDIR(statbuf.st_mode))  
+        {  
+            if ((fileNameList[i] = (char*) malloc(strlen(ent->d_name) + 1))  
+                    == NULL)  
+            {  
+                printf("Malloc heap failed!\n");  
+                return NULL;  
+            }  
+            memset(fileNameList[i], 0, strlen(ent->d_name) + 1);  
+            strcpy(fileNameList[i], ent->d_name);  
+            i++;  
+        }  
+    }
+    closedir(pDir);  
+  
+    *fileCount = count;  
+    return fileNameList;  
 }
 
 //read the file which is gonna be hashed BYTE by BYTE
@@ -168,6 +224,8 @@ int main(int argc, char **argv)
 	int i;	//an int for controling for loop
 	int changeFlag = 1;	//flag for comparison of PCR16 and PCR23
 	char *filePath = "/home/yg115/test/testForSysdig/trace.scap71";
+	const char *path = "/home/yg115/test/generatedFile/";
+	int fileCount = 0;
 	long size = getFileSize(filePath);
 	BYTE s[size];	//an BYTE array to store the content of file
 	long size1;	//for test loop	
@@ -178,57 +236,40 @@ int main(int argc, char **argv)
 	BYTE pcrValue[20];	//an BYTE array to store the pcr value read out from a PCR by readPCR()
 	BYTE pcrValue1[20];	//for the test loop PCR
 	HashThis(hContext, &s, size, &hash);
-
-	DIR *pDir;
-	struct dirent* ent = NULL;
- 	char dir[512]; 
+		
 	
-/*	
-	for(i=0 ; i<19;++i){	//print the hash value
-		printf("%02x",*(hash+i));
-	}
-	printf("\n");
-*/
-	resetPCR(hContext, 23);
-	extendPCR(hContext, 23, hash);
-	readPCR(hContext, 23, pcrValue);	
 
 	while(1){
-/*		
-		if ((pDir = opendir(WRITEPATH)) == NULL)  
-    		{  
-       			fprintf("Cannot open directory:%s\n", path);  
-        		return NULL;  
-    		}
-		while ((ent = readdir(pDir)) != NULL)  
-    		{ 
-        		snprintf(dir, 512, "%s/%s", path, ent->d_name);	//get file name  
-        		 
-    		}
-
-*/
-
-		size1 = getFileSize(filePath);
-		readFile(filePath, size1, s1);
-		HashThis(hContext, &s1, size1, &hash1);
-
 		resetPCR(hContext, 16);
-		extendPCR(hContext, 16, hash1);
+		fileCount = 0;
+		char** fileNameArray = getFileNameArray(path, &fileCount);
+		printf("fileCount is ....%d\n", fileCount);
+		for(int i = 0; i < fileCount; i++){
+        		char *fileDir = *(fileNameArray+i);
+			printf("this is the current file path....%s\n", fileDir);
+        	/*	size1 = getFileSize(fileDir);
+			readFile(fileDir, size1, s1);
+			HashThis(hContext, &s1, size1, &hash1);
+			extendPCR(hContext, 16, hash1);*/
+    		}
+
+	
 		readPCR(hContext, 16, pcrValue1);
+		readPCR(hContext, 23, pcrValue);
 		i = memcmp(pcrValue, pcrValue1, 20);
 		changeFlag = memcmp(pcrValue, pcrValue1, 20);
-		if(changeFlag != 0){
-			printf("changed");
-			break;
-		}
-		
-		printf("out of if....%d\n", *checkFlag);
+
+		//printf("out of if....%d\n", *checkFlag);
 		if(*checkFlag == true){
 			printf("in if.....%d\n", *checkFlag);
 			*checkFlag = false;
+			continue;
 		}
-		
-		
+
+		if(changeFlag != 0){
+			printf("changed");
+			break;
+		}	
 	}
 
 	//-----Postlude

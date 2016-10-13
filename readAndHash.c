@@ -47,6 +47,47 @@ void HashThis(TSS_HCONTEXT hContext, BYTE *content, UINT32 contentSize, BYTE has
 	memcpy(hash,digest,20);
 }
 
+void resetPCR(TSS_HCONTEXT hContext, int pcrToReset)
+{	
+	TSS_HTPM hTPM = 0;
+	TSS_RESULT result;
+	TSS_HPCRS hPcrs;
+	result=Tspi_Context_GetTpmObject(hContext, &hTPM);
+	result = Tspi_Context_CreateObject(hContext, TSS_OBJECT_TYPE_PCRS, 0, &hPcrs);
+	result = Tspi_PcrComposite_SelectPcrIndex(hPcrs, pcrToReset);
+	result = Tspi_TPM_PcrReset(hTPM, hPcrs);
+	DBG("Reset the PCR", result);
+}
+
+void readPCR(TSS_HCONTEXT hContext, UINT32 pcrToRead, BYTE pcrValue[20]){
+	BYTE *digest;
+	TSS_RESULT result;
+	TSS_HTPM hTPM = 0;
+	// Pick the TPM you are talking to in this case the system TPM (which you connect to with “NULL”)
+	result = Tspi_Context_Connect(hContext, NULL);
+	// Get the TPM handle
+	result=Tspi_Context_GetTpmObject(hContext, &hTPM);
+	BYTE *rgbPcrValue;
+	UINT32 ulPcrValueLength=20;
+	int i, j;
+	result = Tspi_TPM_PcrRead(hTPM, pcrToRead, &ulPcrValueLength, &digest);
+	memcpy(pcrValue,digest,20);
+	DBG("Read the PCR", result);
+}
+
+void extendPCR(TSS_HCONTEXT hContext, int pcrToExtend, BYTE *valueToExtend)
+{
+	TSS_HTPM hTPM = 0;
+	TSS_RESULT result;
+	result = Tspi_Context_Connect(hContext, NULL);
+	// Get the TPM handle
+	result=Tspi_Context_GetTpmObject(hContext, &hTPM); 
+	UINT32 PCR_result_length;
+	BYTE *Final_PCR_Value;
+	result = Tspi_TPM_PcrExtend(hTPM, pcrToExtend, 20, valueToExtend, NULL, &PCR_result_length, &Final_PCR_Value);
+	DBG("Extended the PCR", result);
+}
+
 void main(int argc, char **argv){
 	//----------------Preamble, initializing TPM chip
 	TSS_HCONTEXT hContext=0;
@@ -117,7 +158,7 @@ void main(int argc, char **argv){
 	char hashForDB[20];	//help to convert *BYTE to *char
 	int fileNum = 1;	//number flag for log file name, used for strcat()
 	char stringNum[25];	//help to convert int to *char
-	
+	resetPCR(hContext, 23);	//reset PCR23 for a new loop of checking
 	FILE *fp = fopen(inputFilePath, "rb");
 	if(setvbuf(fp, buffer, _IOFBF, BUFFERSIZE) != 0)
 		printf("failed to setup buffer for input file");
@@ -139,7 +180,10 @@ void main(int argc, char **argv){
 			fflush(fpo);
 			fclose(fpo);	
 
-			memset(hashForDB, 0, 20);
+			extendPCR(hContext, 23, bufferHash);	//extend PCR23 to update a new hash value
+			*restartCheck = true;	//set shared memory, restart check in the check process
+
+			memset(hashForDB, 0, 20);	//preparing writing MongoDB
 			printf("\n bufferHash value: ");
 			for(i=0 ; i<19;++i){	//copy the hash value the the *char for json, and print the hash value
 				char jj[2];
@@ -161,9 +205,6 @@ void main(int argc, char **argv){
 			if (!mongoc_collection_insert (collection, MONGOC_INSERT_NONE, insert, NULL, &error)) {
         			fprintf (stderr, "%s\n", error.message);
     			}
-			
-			*restartCheck = true;	//set shared memory, restart check in the check process
-
 		}
 	}
 	bson_destroy (insert);
