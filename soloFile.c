@@ -115,7 +115,7 @@ char** getFileNameArray(const char *path, int *fileCount)
     }  
     while ((ent = readdir(pDir)) != NULL)  
     {
-        snprintf(dir, 512, "%s/%s", path, ent->d_name);  
+        snprintf(dir, 512, "%s%s", path, ent->d_name);  
         lstat(dir, &statbuf);    
         if (!S_ISDIR(statbuf.st_mode))  
         {  
@@ -243,19 +243,33 @@ int main(int argc, char **argv)
 		resetPCR(hContext, 16);
 		fileCount = 0;
 		char** fileNameArray = getFileNameArray(path, &fileCount);
-		printf("fileCount is ....%d\n", fileCount);
-		for(int i = 0; i < fileCount; i++){
-        		char *fileDir = *(fileNameArray+i);
-			printf("this is the current file path....%s\n", fileDir);
-        	/*	size1 = getFileSize(fileDir);
+		//printf("fileCount is ....%d\n", fileCount);
+		for(int i = 1; i <= fileCount; i++){
+        		//char *fileDir = *(fileNameArray+i);	
+			char fileDir[100];
+			sprintf(fileDir, "%s%d", path, i);
+			//printf("this is the current file path....%s\n", fileDir);
+        		size1 = getFileSize(fileDir);
 			readFile(fileDir, size1, s1);
 			HashThis(hContext, &s1, size1, &hash1);
-			extendPCR(hContext, 16, hash1);*/
+			extendPCR(hContext, 16, hash1);
     		}
 
 	
 		readPCR(hContext, 16, pcrValue1);
 		readPCR(hContext, 23, pcrValue);
+
+		printf("\n pcr16 :");
+		for(i=0 ; i<19;++i){			
+			printf("%02x",*(pcrValue1+i));
+		}
+
+		printf("\n pcr23 :");
+		for(i=0 ; i<19;++i){				
+			printf("%02x",*(pcrValue+i));
+		}
+
+
 		i = memcmp(pcrValue, pcrValue1, 20);
 		changeFlag = memcmp(pcrValue, pcrValue1, 20);
 
