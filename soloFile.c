@@ -241,19 +241,20 @@ int main(int argc, char **argv)
 
 	int i;	//an int for controling for loop
 	int changeFlag = 1;	//flag for comparison of PCR16 and PCR23
-	char *filePath = "/home/yg115/test/testForSysdig/trace.scap71";
+	//char *filePath = "/home/yg115/test/testForSysdig/trace.scap71";
 	const char *path = "/home/yg115/test/generatedFile/";
 	int fileCount = 0;
-	long size = getFileSize(filePath);
-	BYTE s[size];	//an BYTE array to store the content of file
-	long size1;	//for test loop	
-	BYTE s1[size];	//for test loop
-	readFile(filePath, size, s);
-	BYTE hash[20];	//an BYTE array to store the hash result of the content in BYTE s[]
+	//long size = getFileSize(filePath);
+	//BYTE s[size];	//an BYTE array to store the content of file
+		//for test loop	
+	//BYTE s1[size];	//for test loop
+	//readFile(filePath, size, s);
+	//BYTE hash[20];	//an BYTE array to store the hash result of the content in BYTE s[]
 	BYTE hash1[20];	//for test loop
 	BYTE pcrValue[20];	//an BYTE array to store the pcr value read out from a PCR by readPCR()
 	BYTE pcrValue1[20];	//for the test loop PCR
-	HashThis(hContext, &s, size, &hash);
+	BYTE pcrValue2[20];	//for single file check
+	//HashThis(hContext, &s, size, &hash);
 		
 	int cflags = REG_EXTENDED;
 	int status;
@@ -272,7 +273,8 @@ int main(int argc, char **argv)
 			char fileDir[100];
 			sprintf(fileDir, "%s%d", path, i);
 			//printf("this is the current file path....%s\n", fileDir);
-        		size1 = getFileSize(fileDir);
+        		long size1 = getFileSize(fileDir);
+			BYTE s1[size1];
 			readFile(fileDir, size1, s1);
 			HashThis(hContext, &s1, size1, &hash1);
 			extendPCR(hContext, 16, hash1);
@@ -304,18 +306,20 @@ int main(int argc, char **argv)
 		}
 
 		if(changeFlag != 0){
-			printf("changed");
+			printf("\nchanged\n");
 
 			resetPCR(hContext, 16);
 			for(int i = 1; i <= fileCount; i++){
 				char fileDir[100];
 				sprintf(fileDir, "%s%d", path, i);
 				//printf("\n.....this is the current file path....%s\n", fileDir);
-				size1 = getFileSize(fileDir);
+				long size1 = getFileSize(fileDir);
+				BYTE s1[size1];
 				readFile(fileDir, size1, s1);
 				HashThis(hContext, &s1, size1, &hash1);
 				extendPCR(hContext, 16, hash1);
-				readPCR(hContext, 16, pcrValue1);
+				readPCR(hContext, 16, pcrValue2);
+				printf("pcrValue2.....%s\n",pcrValue2);
 
 				mongoc_cursor_t *cursor;
 				const bson_t *doc;
@@ -343,8 +347,9 @@ int main(int argc, char **argv)
 						
 					}
 					*(curBuffer+j) = '\0';
-					//printf("curBuffer.....%s\n",curBuffer);
-					if(memcmp(curBuffer, pcrValue1, 20) != 0){
+					printf("curBuffer.....%s\n",curBuffer);
+					printf("pcrValue2.....%s\n",pcrValue2);
+					if(memcmp(curBuffer, pcrValue2, 20) != 0){
 						printf("file %d is changed", i);
 						break;					
 					}
