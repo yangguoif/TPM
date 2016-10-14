@@ -310,7 +310,7 @@ int main(int argc, char **argv)
 			for(int i = 1; i <= fileCount; i++){
 				char fileDir[100];
 				sprintf(fileDir, "%s%d", path, i);
-				printf("\n.....this is the current file path....%s\n", fileDir);
+				//printf("\n.....this is the current file path....%s\n", fileDir);
 				size1 = getFileSize(fileDir);
 				readFile(fileDir, size1, s1);
 				HashThis(hContext, &s1, size1, &hash1);
@@ -326,9 +326,6 @@ int main(int argc, char **argv)
 				BSON_APPEND_UTF8 (query, "fileName", fileDir);
 
     				cursor = mongoc_collection_find (collection, MONGOC_QUERY_NONE, 0, 0, 0, query, NULL, NULL);
-				//while (mongoc_cursor_next (cursor, &doc)) {
-				
-
 				mongoc_cursor_next (cursor, &doc);
 				
 				strMongo = bson_as_json (doc, NULL);
@@ -337,21 +334,25 @@ int main(int argc, char **argv)
 				if(status == REG_NOMATCH)
 					printf("No match");
 				else{
-					char *curBuffer = (char *)malloc(sizeof(char)*20);
+					char* curBuffer = (char *)malloc(sizeof(char)*40);
 					int j = 0;
 					for(int i = pmatch[0].rm_so + 10; i < pmatch[0].rm_eo; ++i){
 						//putchar(strMongo[i]);
-						*(curBuffer+(j++)) = strMongo[i];
+						*(curBuffer+j) = strMongo[i];
+						j++;
 						
 					}
-					printf("curBuffer.....%s",curBuffer);	
-					printf("\n");
+					*(curBuffer+j) = '\0';
+					//printf("curBuffer.....%s\n",curBuffer);
+					if(memcmp(curBuffer, pcrValue1, 20) != 0){
+						printf("file %d is changed", i);
+						break;					
+					}
 					free(curBuffer);
 				}
 				printf ("from mongo db%s\n", strMongo);
 				bson_free (strMongo);
 				regfree(&reg);
-				//}
 				bson_destroy (query);
 				mongoc_cursor_destroy (cursor);
 	    		}
