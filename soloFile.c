@@ -9,6 +9,11 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <regex.h>
+
+#include <bson.h>
+#include <bcon.h>
+#include <mongoc.h>
 
 #include <tss/tss_error.h>
 #include <tss/platform.h>
@@ -35,7 +40,7 @@ void extendPCR(TSS_HCONTEXT hContext, int pcrToExtend, BYTE *valueToExtend)
 	UINT32 PCR_result_length;
 	BYTE *Final_PCR_Value;
 	result = Tspi_TPM_PcrExtend(hTPM, pcrToExtend, 20, valueToExtend, NULL, &PCR_result_length, &Final_PCR_Value);
-	DBG("Extended the PCR", result);
+	//DBG("Extended the PCR", result);
 }
 
 //reset a PCR to default value
@@ -49,7 +54,7 @@ void resetPCR(TSS_HCONTEXT hContext, int pcrToReset)
 	result = Tspi_Context_CreateObject(hContext, TSS_OBJECT_TYPE_PCRS, 0, &hPcrs);
 	result = Tspi_PcrComposite_SelectPcrIndex(hPcrs, pcrToReset);
 	result = Tspi_TPM_PcrReset(hTPM, hPcrs);
-	DBG("Reset the PCR", result);
+	//DBG("Reset the PCR", result);
 }
 
 void readPCR(TSS_HCONTEXT hContext, UINT32 pcrToRead, BYTE pcrValue[20]){
@@ -65,7 +70,7 @@ void readPCR(TSS_HCONTEXT hContext, UINT32 pcrToRead, BYTE pcrValue[20]){
 	int i, j;
 	result = Tspi_TPM_PcrRead(hTPM, pcrToRead, &ulPcrValueLength, &digest);
 	memcpy(pcrValue,digest,20);
-	DBG("Read the PCR", result);
+	//DBG("Read the PCR", result);
 }
 
 //hash an array of BYTE (which is the file which is gonna be hashed). 
@@ -83,7 +88,7 @@ void HashThis(TSS_HCONTEXT hContext, BYTE *content, UINT32 contentSize, BYTE has
 	// Hash the data using SHA1
 	result=Tspi_Hash_UpdateHashValue(hHashOfESSKey, contentSize, content);
 	result=Tspi_Hash_GetHashValue(hHashOfESSKey, &digestLen, &digest);
-	DBG("Get the hashed result", result);
+	//DBG("Get the hashed result", result);
 	memcpy(hash,digest,20);
 }
 
@@ -200,6 +205,19 @@ int main(int argc, char **argv)
 	// Note: TSS_SECRET_MODE_SHA1 says “Don’t hash this. Just use the 20 bytes as is.
 	//-----------------
 	
+	//---------------------initialize mongodb connection
+	mongoc_client_t *client;
+	mongoc_collection_t *collection;
+	
+	
+
+	mongoc_init ();
+
+	client = mongoc_client_new ("mongodb://localhost:27017/");
+	collection = mongoc_client_get_collection (client, "logHash", "testHash");
+	
+	//---------------------------
+
 	//-----------------initializing shared memory for the communication between check code and this code
 	void *shm = NULL;	//the first memory address in this code for shared memory
 	int shmid;	//shared memory id
@@ -237,7 +255,12 @@ int main(int argc, char **argv)
 	BYTE pcrValue1[20];	//for the test loop PCR
 	HashThis(hContext, &s, size, &hash);
 		
-	
+	int cflags = REG_EXTENDED;
+	int status;
+	regmatch_t pmatch[1];
+	const size_t nmatch = 1;
+	regex_t reg;
+	const char * pattern = "\\Value\" : \"([0-9]|[a-z])+";
 
 	while(1){
 		resetPCR(hContext, 16);
@@ -282,6 +305,59 @@ int main(int argc, char **argv)
 
 		if(changeFlag != 0){
 			printf("changed");
+
+			resetPCR(hContext, 16);
+			for(int i = 1; i <= fileCount; i++){
+				char fileDir[100];
+				sprintf(fileDir, "%s%d", path, i);
+				printf("\n.....this is the current file path....%s\n", fileDir);
+				size1 = getFileSize(fileDir);
+				readFile(fileDir, size1, s1);
+				HashThis(hContext, &s1, size1, &hash1);
+				extendPCR(hContext, 16, hash1);
+				readPCR(hContext, 16, pcrValue1);
+
+				mongoc_cursor_t *cursor;
+				const bson_t *doc;
+				bson_t *query;
+				char *strMongo;
+				query = bson_new ();
+
+				BSON_APPEND_UTF8 (query, "fileName", fileDir);
+
+    				cursor = mongoc_collection_find (collection, MONGOC_QUERY_NONE, 0, 0, 0, query, NULL, NULL);
+				//while (mongoc_cursor_next (cursor, &doc)) {
+				
+
+				mongoc_cursor_next (cursor, &doc);
+				
+				strMongo = bson_as_json (doc, NULL);
+				regcomp(&reg, pattern,cflags);
+				status = regexec(&reg, strMongo, nmatch, pmatch, 0);
+				if(status == REG_NOMATCH)
+					printf("No match");
+				else{
+					char *curBuffer = (char *)malloc(sizeof(char)*20);
+					int j = 0;
+					for(int i = pmatch[0].rm_so + 10; i < pmatch[0].rm_eo; ++i){
+						//putchar(strMongo[i]);
+						*(curBuffer+(j++)) = strMongo[i];
+						
+					}
+					printf("curBuffer.....%s",curBuffer);	
+					printf("\n");
+					free(curBuffer);
+				}
+				printf ("from mongo db%s\n", strMongo);
+				bson_free (strMongo);
+				regfree(&reg);
+				//}
+				bson_destroy (query);
+				mongoc_cursor_destroy (cursor);
+	    		}
+			mongoc_collection_destroy (collection);
+			mongoc_client_destroy (client);
+			mongoc_cleanup ();  		
 			break;
 		}	
 	}
