@@ -43,7 +43,7 @@ void HashThis(TSS_HCONTEXT hContext, BYTE *content, UINT32 contentSize, BYTE has
 	// Hash the data using SHA1
 	result=Tspi_Hash_UpdateHashValue(hHashOfESSKey, contentSize, content);
 	result=Tspi_Hash_GetHashValue(hHashOfESSKey, &digestLen, &digest);
-	DBG("Get the hashed result", result);
+	//DBG("Get the hashed result", result);
 	memcpy(hash,digest,20);
 }
 
@@ -56,7 +56,7 @@ void resetPCR(TSS_HCONTEXT hContext, int pcrToReset)
 	result = Tspi_Context_CreateObject(hContext, TSS_OBJECT_TYPE_PCRS, 0, &hPcrs);
 	result = Tspi_PcrComposite_SelectPcrIndex(hPcrs, pcrToReset);
 	result = Tspi_TPM_PcrReset(hTPM, hPcrs);
-	DBG("Reset the PCR", result);
+	//DBG("Reset the PCR", result);
 }
 
 void readPCR(TSS_HCONTEXT hContext, UINT32 pcrToRead, BYTE pcrValue[20]){
@@ -72,7 +72,7 @@ void readPCR(TSS_HCONTEXT hContext, UINT32 pcrToRead, BYTE pcrValue[20]){
 	int i, j;
 	result = Tspi_TPM_PcrRead(hTPM, pcrToRead, &ulPcrValueLength, &digest);
 	memcpy(pcrValue,digest,20);
-	DBG("Read the PCR", result);
+	//DBG("Read the PCR", result);
 }
 
 void extendPCR(TSS_HCONTEXT hContext, int pcrToExtend, BYTE *valueToExtend)
@@ -85,7 +85,7 @@ void extendPCR(TSS_HCONTEXT hContext, int pcrToExtend, BYTE *valueToExtend)
 	UINT32 PCR_result_length;
 	BYTE *Final_PCR_Value;
 	result = Tspi_TPM_PcrExtend(hTPM, pcrToExtend, 20, valueToExtend, NULL, &PCR_result_length, &Final_PCR_Value);
-	DBG("Extended the PCR", result);
+	//DBG("Extended the PCR", result);
 }
 
 void main(int argc, char **argv){
@@ -166,7 +166,7 @@ void main(int argc, char **argv){
 		while(feof != 1){
 			memset(bufferHash, 0, BUFFERSIZE);
 			fread(buffer, sizeof(buffer), 1, fp);
-			sleep(2);
+			sleep(5);
 			memset(bufferHash, 0, 20);
 			HashThis(hContext, &buffer, BUFFERSIZE, &bufferHash);
 
@@ -182,15 +182,17 @@ void main(int argc, char **argv){
 			fclose(fpo);	
 
 			extendPCR(hContext, 23, bufferHash);	//extend PCR23 to update a new hash value
+			BYTE pcrValue2[20];
+			readPCR(hContext, 23, pcrValue2);
 			*restartCheck = true;	//set shared memory, restart check in the check process
 
 			memset(hashForDB, 0, 20);	//preparing writing MongoDB
-			printf("\n bufferHash value: ");
+			printf("\n pcr23 value after extend: ");
 			for(i=0 ; i<19;++i){	//copy the hash value the the *char for json, and print the hash value
 				char jj[2];
-				sprintf(jj, "%02x", *(bufferHash+i));
+				sprintf(jj, "%02x", *(pcrValue2+i));
 				strcat(hashForDB, jj);					
-				printf("%02x",*(bufferHash+i));
+				printf("%02x",*(pcrValue2+i));
 			}
 			printf("\n");
 
