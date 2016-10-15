@@ -307,7 +307,7 @@ int main(int argc, char **argv)
 		i = memcmp(pcrValue, pcrValue1, 20);
 		changeFlag = memcmp(pcrValue, pcrValue1, 20);
 
-		//printf("out of if....%d\n", *checkFlag);
+		printf("out of if....%d\n", *checkFlag);
 		if(*checkFlag == true){
 			printf("in if.....%d\n", *checkFlag);
 			*checkFlag = false;

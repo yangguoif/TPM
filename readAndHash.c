@@ -166,7 +166,7 @@ void main(int argc, char **argv){
 		while(feof != 1){
 			memset(bufferHash, 0, BUFFERSIZE);
 			fread(buffer, sizeof(buffer), 1, fp);
-			sleep(5);
+			//sleep(5);
 			memset(bufferHash, 0, 20);
 			HashThis(hContext, &buffer, BUFFERSIZE, &bufferHash);
 
