@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/shm.h>
+#include <sys/sem.h> 
 
 #include <bson.h>
 #include <bcon.h>
@@ -19,6 +20,13 @@
 
 #define DBG(message, tResult) printf("Line%d, %s)%s returned 0x%08x. %s.\n", __LINE__, __func__, message, tResult, (char *)Trspi_Error_String(tResult))
 #define BUFFERSIZE 20
+
+union semun  
+{  
+    int val;  
+    struct semid_ds *buf;  
+    unsigned short *arry;  
+};  
 
 /*
 void readFile(char *filePath, long fileSize, BYTE *s){
@@ -88,6 +96,53 @@ void extendPCR(TSS_HCONTEXT hContext, int pcrToExtend, BYTE *valueToExtend)
 	//DBG("Extended the PCR", result);
 }
 
+
+static int set_semvalue(int sem_id)  //initialize semaphore
+{  
+    union semun sem_union;  
+  
+    sem_union.val = 1;  
+    if(semctl(sem_id, 0, SETVAL, sem_union) == -1)  
+        return 0;  
+    return 1;  
+}  
+  
+static void del_semvalue(int sem_id)  //delete semaphore
+{  
+    union semun sem_union;  
+  
+    if(semctl(sem_id, 0, IPC_RMID, sem_union) == -1)  
+        fprintf(stderr, "Failed to delete semaphore\n");  
+}  
+  
+static int semaphore_p(int sem_id)  
+{   
+    struct sembuf sem_b;  
+    sem_b.sem_num = 0;  
+    sem_b.sem_op = -1;//P()  
+    sem_b.sem_flg = SEM_UNDO;  
+    if(semop(sem_id, &sem_b, 1) == -1)  
+    {  
+        fprintf(stderr, "semaphore_p failed\n");  
+        return 0;  
+    }  
+    return 1;  
+}  
+  
+static int semaphore_v(int sem_id)  
+{   
+    struct sembuf sem_b;  
+    sem_b.sem_num = 0;  
+    sem_b.sem_op = 1;//V()  
+    sem_b.sem_flg = SEM_UNDO;  
+    if(semop(sem_id, &sem_b, 1) == -1)  
+    {  
+        fprintf(stderr, "semaphore_v failed\n");  
+        return 0;  
+    }  
+    return 1;  
+} 
+
 void main(int argc, char **argv){
 	//----------------Preamble, initializing TPM chip
 	TSS_HCONTEXT hContext=0;
@@ -147,6 +202,18 @@ void main(int argc, char **argv){
 	restartCheck = (bool*) shm;
 
 	//-----------------initializing shared memory ends
+	//---------------initialize semaphore
+	int sem_id = semget((key_t)1235, 1, 0666 | IPC_CREAT); 
+	if(!set_semvalue(sem_id))  
+        {  
+            printf(stderr, "Failed to initialize semaphore\n");  
+            exit(EXIT_FAILURE);  
+        }  
+
+	//-----------------------------
+
+
+
 
 	char *inputFilePath = "/home/yg115/test/testForSysdig/trace.scap71";
 	char outputFilePath[80];	//output file path for the content in buffer, the new
@@ -166,7 +233,7 @@ void main(int argc, char **argv){
 		while(feof != 1){
 			memset(bufferHash, 0, BUFFERSIZE);
 			fread(buffer, sizeof(buffer), 1, fp);
-			//sleep(5);
+			sleep(2);
 			memset(bufferHash, 0, 20);
 			HashThis(hContext, &buffer, BUFFERSIZE, &bufferHash);
 
@@ -184,7 +251,12 @@ void main(int argc, char **argv){
 			extendPCR(hContext, 23, bufferHash);	//extend PCR23 to update a new hash value
 			BYTE pcrValue2[20];
 			readPCR(hContext, 23, pcrValue2);
+			
+			if(!semaphore_p(sem_id))  
+           			exit(EXIT_FAILURE);
 			*restartCheck = true;	//set shared memory, restart check in the check process
+			if(!semaphore_v(sem_id)) 
+           			exit(EXIT_FAILURE);
 
 			memset(hashForDB, 0, 20);	//preparing writing MongoDB
 			printf("\n pcr23 value after extend: ");
@@ -225,5 +297,6 @@ void main(int argc, char **argv){
         	fprintf(stderr, "shmctl(IPC_RMID) failed\n");  
         	exit(EXIT_FAILURE);  
     	}  
+	del_semvalue(sem_id);	//delete semaphore
 	
 }

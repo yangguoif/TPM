@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <regex.h>
+#include <sys/sem.h> 
 
 #include <bson.h>
 #include <bcon.h>
@@ -25,6 +26,12 @@
 
 #define DBG(message, tResult) printf("Line%d, %s)%s returned 0x%08x. %s.\n", __LINE__, __func__, message, tResult, (char *)Trspi_Error_String(tResult))
 
+union semun  
+{  
+    int val;  
+    struct semid_ds *buf;  
+    unsigned short *arry;  
+};
 //#define path /home/yg115/test/generatedFile/
 
 //extend a PCR's value
@@ -179,6 +186,52 @@ void readFile(char *filePath, long fileSize, BYTE *s){
 	fclose(fp);
 }
 
+static int set_semvalue(int sem_id)  //initialize semaphore
+{  
+    union semun sem_union;  
+  
+    sem_union.val = 1;  
+    if(semctl(sem_id, 0, SETVAL, sem_union) == -1)  
+        return 0;  
+    return 1;  
+}  
+  
+static void del_semvalue(int sem_id)  //delete semaphore
+{  
+    union semun sem_union;  
+  
+    if(semctl(sem_id, 0, IPC_RMID, sem_union) == -1)  
+        fprintf(stderr, "Failed to delete semaphore\n");  
+}  
+  
+static int semaphore_p(int sem_id)  
+{   
+    struct sembuf sem_b;  
+    sem_b.sem_num = 0;  
+    sem_b.sem_op = -1;//P()  
+    sem_b.sem_flg = SEM_UNDO;  
+    if(semop(sem_id, &sem_b, 1) == -1)  
+    {  
+        fprintf(stderr, "semaphore_p failed\n");  
+        return 0;  
+    }  
+    return 1;  
+}  
+  
+static int semaphore_v(int sem_id)  
+{   
+    struct sembuf sem_b;  
+    sem_b.sem_num = 0;  
+    sem_b.sem_op = 1;//V()  
+    sem_b.sem_flg = SEM_UNDO;  
+    if(semop(sem_id, &sem_b, 1) == -1)  
+    {  
+        fprintf(stderr, "semaphore_v failed\n");  
+        return 0;  
+    }  
+    return 1;  
+} 
+
 int main(int argc, char **argv)
 {
 	//-----Preamble
@@ -238,6 +291,9 @@ int main(int argc, char **argv)
 	checkFlag = (bool*) shm;
 
 	//-----------------initializing shared memory ends
+	//------------------initialize semaphre
+	int sem_id = semget((key_t)1235, 1, 0666 | IPC_CREAT); 
+	//-----------------------
 
 	int i;	//an int for controling for loop
 	int changeFlag = 1;	//flag for comparison of PCR16 and PCR23
@@ -308,11 +364,17 @@ int main(int argc, char **argv)
 		changeFlag = memcmp(pcrValue, pcrValue1, 20);
 
 		printf("out of if....%d\n", *checkFlag);
+		if(!semaphore_p(sem_id))  
+           			exit(EXIT_FAILURE);
 		if(*checkFlag == true){
 			printf("in if.....%d\n", *checkFlag);
 			*checkFlag = false;
+			if(!semaphore_v(sem_id))  
+           			exit(EXIT_FAILURE);
 			continue;
 		}
+		if(!semaphore_v(sem_id))  
+           			exit(EXIT_FAILURE);
 
 		if(changeFlag != 0){
 			printf("\nchanged\n");
