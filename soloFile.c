@@ -294,24 +294,15 @@ int main(int argc, char **argv)
 	//------------------initialize semaphre
 	int sem_id = semget((key_t)1235, 1, 0666 | IPC_CREAT); 
 	//-----------------------
-
 	int i;	//an int for controling for loop
 	int changeFlag = 1;	//flag for comparison of PCR16 and PCR23
-	//char *filePath = "/home/yg115/test/testForSysdig/trace.scap71";
 	const char *path = "/home/yg115/test/generatedFile/";
 	int fileCount = 0;
-	//long size = getFileSize(filePath);
-	//BYTE s[size];	//an BYTE array to store the content of file
-		//for test loop	
-	//BYTE s1[size];	//for test loop
-	//readFile(filePath, size, s);
-	//BYTE hash[20];	//an BYTE array to store the hash result of the content in BYTE s[]
 	BYTE hash1[20];	//for test loop
 	BYTE pcrValue[20];	//an BYTE array to store the pcr value read out from a PCR by readPCR()
 	BYTE pcrValue1[20];	//for the test loop PCR
 	BYTE pcrValue2[20];	//for single file check
 	BYTE pcrValue3[20];
-	//HashThis(hContext, &s, size, &hash);
 		
 	int cflags = REG_EXTENDED;
 	int status;
@@ -378,7 +369,7 @@ int main(int argc, char **argv)
 
 		if(changeFlag != 0){
 			printf("\nchanged\n");
-/*
+
 			resetPCR(hContext, 16);
 			for(int i = 1; i <= fileCount; i++){
 				char fileDir[100];
@@ -390,11 +381,14 @@ int main(int argc, char **argv)
 				HashThis(hContext, &s1, size1, &hash1);
 				extendPCR(hContext, 16, hash1);
 				readPCR(hContext, 16, pcrValue3);
-				printf("pcr2:");
+
+				char *curBuffer1 = (char *)malloc(sizeof(char)*40);
+				char *curBuffer1Mark = curBuffer1;
 				for(int j=0 ; j<19;++j){				
-					printf("%02x",*(pcrValue3+j));
+					sprintf(curBuffer1, "%02x", (unsigned char)pcrValue3[j]);
+					curBuffer1 += 2;
 				}
-				printf("\n");;
+				printf("formed char from byte: %s\n", curBuffer1Mark);
 
 				mongoc_cursor_t *cursor;
 				const bson_t *doc;
@@ -423,19 +417,26 @@ int main(int argc, char **argv)
 					}
 					*(curBuffer+j) = '\0';
 					printf("curBuffer.....%s\n",curBuffer);
-					printf("pcrValue2.....%s\n",pcrValue3);
-					if(memcmp(curBuffer, pcrValue3, 20) != 0){
+
+					if(memcmp(curBuffer, curBuffer1Mark, 20) != 0){
 						printf("file %d is changed", i);
+						bson_free (strMongo);
+						regfree(&reg);
+						bson_destroy (query);
+						mongoc_cursor_destroy (cursor);
+						free(curBuffer);
+						free(curBuffer1Mark);
 						break;					
 					}
 					free(curBuffer);
+					free(curBuffer1Mark);
 				}
 				printf ("from mongo db%s\n", strMongo);
 				bson_free (strMongo);
 				regfree(&reg);
 				bson_destroy (query);
 				mongoc_cursor_destroy (cursor);
-	    		}*/
+	    		}
 			mongoc_collection_destroy (collection);
 			mongoc_client_destroy (client);
 			mongoc_cleanup ();  		
