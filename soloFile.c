@@ -400,7 +400,7 @@ int main(int argc, char **argv)
 					//printf("curBuffer.....%s\n",curBuffer);
 
 					if(memcmp(curBuffer, curBuffer1Mark, 20) != 0){
-						printf("file %d is changed\n", i);
+						printf("File %d is changed\n", i);
 						break;					
 					}
 					free(curBuffer);
@@ -412,9 +412,12 @@ int main(int argc, char **argv)
 				bson_destroy (query);
 				mongoc_cursor_destroy (cursor);
 	    		}
-			sleep(3);
 			
-		}	
+			
+		}else{
+			printf("No file is changed\n");
+		}
+		sleep(3);	
 	}
 
 	mongoc_collection_destroy (collection);
