@@ -135,8 +135,6 @@ char** getFileNameArray(const char *path, int *fileCount)
         }  
     }   
     closedir(pDir);
-
- 	
 	
     if ((fileNameList = (char**) malloc(sizeof(char*) * count)) == NULL)  
     {  
@@ -261,16 +259,10 @@ int main(int argc, char **argv)
 	//---------------------initialize mongodb connection
 	mongoc_client_t *client;
 	mongoc_collection_t *collection;
-	
-	
-
 	mongoc_init ();
-
 	client = mongoc_client_new ("mongodb://localhost:27017/");
-	collection = mongoc_client_get_collection (client, "logHash", "testHash");
-	
+	collection = mongoc_client_get_collection (client, "logHash", "testHash");	
 	//---------------------------
-
 	//-----------------initializing shared memory for the communication between check code and this code
 	void *shm = NULL;	//the first memory address in this code for shared memory
 	int shmid;	//shared memory id
@@ -315,32 +307,26 @@ int main(int argc, char **argv)
 		resetPCR(hContext, 16);
 		fileCount = 0;
 		char** fileNameArray = getFileNameArray(path, &fileCount);
-		printf("fileCount is ....%d\n", fileCount);
-		for(int i = 1; i <= fileCount; i++){
-        		//char *fileDir = *(fileNameArray+i);	
+		//printf("fileCount is ....%d\n", fileCount);
+		for(int i = 1; i <= fileCount; i++){	
 			char fileDir[100];
 			sprintf(fileDir, "%s%d", path, i);
-			//printf("\n i is %d\n", i);
-			//printf("\nthis is the current file path....%s\n", fileDir);
         		long size1 = getFileSize(fileDir);
 			BYTE s1[size1];
 			readFile(fileDir, size1, s1);
 			HashThis(hContext, &s1, size1, &hash1);
 			extendPCR(hContext, 16, hash1);
 
-			printf("file path....%s     pcrvalue...", fileDir);
+			//printf("file path....%s     pcrvalue...", fileDir);
 			readPCR(hContext, 16, pcrValue2);
-			for(int j=0 ; j<19;++j){				
+			/*for(int j=0 ; j<19;++j){				
 				printf("%02x",*(pcrValue2+j));
 			}
-			printf("\n");
+			printf("\n");*/
     		}
-
-	
 		readPCR(hContext, 16, pcrValue1);
 		readPCR(hContext, 23, pcrValue);
-
-		printf("\n pcr16 :");
+	/*	printf("\n pcr16 :");
 		for(i=0 ; i<19;++i){			
 			printf("%02x",*(pcrValue1+i));
 		}
@@ -348,17 +334,15 @@ int main(int argc, char **argv)
 		printf("\n pcr23 :");
 		for(i=0 ; i<19;++i){				
 			printf("%02x",*(pcrValue+i));
-		}
-
-
+		}*/
 		i = memcmp(pcrValue, pcrValue1, 20);
 		changeFlag = memcmp(pcrValue, pcrValue1, 20);
-
-		printf("out of if....%d\n", *checkFlag);
+		//printf("out of if....%d\n", *checkFlag);
 		if(!semaphore_p(sem_id))  
            			exit(EXIT_FAILURE);
+		//printf("get into the semophre");
 		if(*checkFlag == true){
-			printf("in if.....%d\n", *checkFlag);
+			//printf("in if.....%d\n", *checkFlag);
 			*checkFlag = false;
 			if(!semaphore_v(sem_id))  
            			exit(EXIT_FAILURE);
@@ -366,15 +350,12 @@ int main(int argc, char **argv)
 		}
 		if(!semaphore_v(sem_id))  
            			exit(EXIT_FAILURE);
-
 		if(changeFlag != 0){
-			printf("\nchanged\n");
-
+			//printf("\nchanged\n");
 			resetPCR(hContext, 16);
 			for(int i = 1; i <= fileCount; i++){
 				char fileDir[100];
 				sprintf(fileDir, "%s%d", path, i);
-				//printf("\n.....this is the current file path....%s\n", fileDir);
 				long size1 = getFileSize(fileDir);
 				BYTE s1[size1];
 				readFile(fileDir, size1, s1);
@@ -388,7 +369,7 @@ int main(int argc, char **argv)
 					sprintf(curBuffer1, "%02x", (unsigned char)pcrValue3[j]);
 					curBuffer1 += 2;
 				}
-				printf("formed char from byte: %s\n", curBuffer1Mark);
+				//printf("formed char from byte: %s\n", curBuffer1Mark);
 
 				mongoc_cursor_t *cursor;
 				const bson_t *doc;
@@ -416,7 +397,7 @@ int main(int argc, char **argv)
 						
 					}
 					*(curBuffer+j) = '\0';
-					printf("curBuffer.....%s\n",curBuffer);
+					//printf("curBuffer.....%s\n",curBuffer);
 
 					if(memcmp(curBuffer, curBuffer1Mark, 20) != 0){
 						printf("file %d is changed", i);
@@ -431,7 +412,7 @@ int main(int argc, char **argv)
 					free(curBuffer);
 					free(curBuffer1Mark);
 				}
-				printf ("from mongo db%s\n", strMongo);
+				//printf ("from mongo db%s\n", strMongo);
 				bson_free (strMongo);
 				regfree(&reg);
 				bson_destroy (query);

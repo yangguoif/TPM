@@ -28,14 +28,6 @@ union semun
     unsigned short *arry;  
 };  
 
-/*
-void readFile(char *filePath, long fileSize, BYTE *s){
-	FILE *fp = fopen(filePath, "rb");
-	fread(s, sizeof(BYTE), fileSize, fp);
-	fclose(fp);
-}
-*/
-
 //hash an array of BYTE (which is the file which is gonna be hashed). 
 //BYTE *content: the array of BYTE which is gonna be hashed
 //BYTE hash[20]: the hash result
@@ -95,7 +87,6 @@ void extendPCR(TSS_HCONTEXT hContext, int pcrToExtend, BYTE *valueToExtend)
 	result = Tspi_TPM_PcrExtend(hTPM, pcrToExtend, 20, valueToExtend, NULL, &PCR_result_length, &Final_PCR_Value);
 	//DBG("Extended the PCR", result);
 }
-
 
 static int set_semvalue(int sem_id)  //initialize semaphore
 {  
@@ -209,12 +200,7 @@ void main(int argc, char **argv){
             printf(stderr, "Failed to initialize semaphore\n");  
             exit(EXIT_FAILURE);  
         }  
-
 	//-----------------------------
-
-
-
-
 	char *inputFilePath = "/home/yg115/test/testForSysdig/trace.scap71";
 	char outputFilePath[80];	//output file path for the content in buffer, the new
 							//file will be created and the fileNum will be added at the back
@@ -236,28 +222,23 @@ void main(int argc, char **argv){
 			sleep(2);
 			memset(bufferHash, 0, 20);
 			HashThis(hContext, &buffer, BUFFERSIZE, &bufferHash);
-
 			snprintf(stringNum, 25, "%d", fileNum);	//generate outputFilePath
 			fileNum++;
 			memset(outputFilePath, 0, sizeof(outputFilePath)/sizeof(char));
 			strcat(outputFilePath, "/home/yg115/test/generatedFile/");
 			strcat(outputFilePath, stringNum);
-		
 			FILE *fpo = fopen(outputFilePath, "wb");
 			size_t ret = fwrite(buffer, sizeof(BYTE), sizeof(buffer), fpo);	//write content in buffer into file
 			fflush(fpo);
 			fclose(fpo);	
-
-			extendPCR(hContext, 23, bufferHash);	//extend PCR23 to update a new hash value
-			BYTE pcrValue2[20];
-			readPCR(hContext, 23, pcrValue2);
-			
 			if(!semaphore_p(sem_id))  
            			exit(EXIT_FAILURE);
+			extendPCR(hContext, 23, bufferHash);	//extend PCR23 to update a new hash value
+			BYTE pcrValue2[20];
+			readPCR(hContext, 23, pcrValue2);		
 			*restartCheck = true;	//set shared memory, restart check in the check process
 			if(!semaphore_v(sem_id)) 
            			exit(EXIT_FAILURE);
-
 			memset(hashForDB, 0, 20);	//preparing writing MongoDB
 			printf("\n pcr23 value after extend: ");
 			for(i=0 ; i<19;++i){	//copy the hash value the the *char for json, and print the hash value
@@ -267,7 +248,6 @@ void main(int argc, char **argv){
 				printf("%02x",*(pcrValue2+i));
 			}
 			printf("\n");
-
 			memset(jsonForDB, 0, sizeof(jsonForDB)/sizeof(jsonForDB));	//organizing Json format to convert to
 			strcat(jsonForDB, "{\"fileName\":\"");				//BSON for DB writing
 			strcat(jsonForDB, outputFilePath);
