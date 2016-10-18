@@ -400,13 +400,7 @@ int main(int argc, char **argv)
 					//printf("curBuffer.....%s\n",curBuffer);
 
 					if(memcmp(curBuffer, curBuffer1Mark, 20) != 0){
-						printf("file %d is changed", i);
-						bson_free (strMongo);
-						regfree(&reg);
-						bson_destroy (query);
-						mongoc_cursor_destroy (cursor);
-						free(curBuffer);
-						free(curBuffer1Mark);
+						printf("file %d is changed\n", i);
 						break;					
 					}
 					free(curBuffer);
@@ -418,13 +412,14 @@ int main(int argc, char **argv)
 				bson_destroy (query);
 				mongoc_cursor_destroy (cursor);
 	    		}
-			mongoc_collection_destroy (collection);
-			mongoc_client_destroy (client);
-			mongoc_cleanup ();  		
-			break;
+			sleep(3);
+			
 		}	
 	}
 
+	mongoc_collection_destroy (collection);
+	mongoc_client_destroy (client);
+	mongoc_cleanup ();  
 	//-----Postlude
 	Tspi_Context_Close(hContext);
 	Tspi_Context_FreeMemory(hContext, NULL);
