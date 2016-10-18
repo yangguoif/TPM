@@ -204,6 +204,7 @@ void main(int argc, char **argv){
 	char *inputFilePath = "/home/yg115/test/testForSysdig/trace.scap71";
 	char outputFilePath[80];	//output file path for the content in buffer, the new
 							//file will be created and the fileNum will be added at the back
+	char outputFilePath1[80];
 	int i;
 	char jsonForDB[200];	//help to organize json format for storing hash value into DB
 	BYTE buffer[BUFFERSIZE];	//buffer for the content read from streaming data and going to write into log file
@@ -222,6 +223,10 @@ void main(int argc, char **argv){
 			sleep(2);
 			memset(bufferHash, 0, 20);
 			HashThis(hContext, &buffer, BUFFERSIZE, &bufferHash);
+			BYTE bufferCopy[sizeof(buffer)];
+			memcpy(bufferCopy,buffer,sizeof(buffer));			
+
+
 			snprintf(stringNum, 25, "%d", fileNum);	//generate outputFilePath
 			fileNum++;
 			memset(outputFilePath, 0, sizeof(outputFilePath)/sizeof(char));
@@ -230,7 +235,16 @@ void main(int argc, char **argv){
 			FILE *fpo = fopen(outputFilePath, "wb");
 			size_t ret = fwrite(buffer, sizeof(BYTE), sizeof(buffer), fpo);	//write content in buffer into file
 			fflush(fpo);
-			fclose(fpo);	
+			fclose(fpo);
+			
+			memset(outputFilePath1, 0, sizeof(outputFilePath1)/sizeof(char));
+			strcat(outputFilePath1, "/home/yg115/test/generatedFileCopy/");
+			strcat(outputFilePath1, stringNum);
+			FILE *fpo1 = fopen(outputFilePath1, "wb");
+			size_t ret1 = fwrite(bufferCopy, sizeof(BYTE), sizeof(bufferCopy), fpo1);	//write content in buffer into file
+			fflush(fpo1);
+			fclose(fpo1);
+
 			if(!semaphore_p(sem_id))  
            			exit(EXIT_FAILURE);
 			extendPCR(hContext, 23, bufferHash);	//extend PCR23 to update a new hash value
