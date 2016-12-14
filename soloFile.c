@@ -326,15 +326,7 @@ int main(int argc, char **argv)
     		}
 		readPCR(hContext, 16, pcrValue1);
 		readPCR(hContext, 23, pcrValue);
-	/*	printf("\n pcr16 :");
-		for(i=0 ; i<19;++i){			
-			printf("%02x",*(pcrValue1+i));
-		}
-
-		printf("\n pcr23 :");
-		for(i=0 ; i<19;++i){				
-			printf("%02x",*(pcrValue+i));
-		}*/
+		
 		i = memcmp(pcrValue, pcrValue1, 20);
 		changeFlag = memcmp(pcrValue, pcrValue1, 20);
 		//printf("out of if....%d\n", *checkFlag);
@@ -350,6 +342,16 @@ int main(int argc, char **argv)
 		}
 		if(!semaphore_v(sem_id))  
            			exit(EXIT_FAILURE);
+		printf("\n pcr16 :");
+		for(i=0 ; i<19;++i){			
+			printf("%02x",*(pcrValue1+i));
+		}
+
+		printf("\n pcr23 :");
+		for(i=0 ; i<19;++i){				
+			printf("%02x",*(pcrValue+i));
+		}
+		printf("\n");
 		if(changeFlag != 0){
 			//printf("\nchanged\n");
 			resetPCR(hContext, 16);
@@ -417,7 +419,7 @@ int main(int argc, char **argv)
 		}else{
 			printf("No file is changed\n");
 		}
-		sleep(3);	
+		sleep(3);
 	}
 
 	mongoc_collection_destroy (collection);

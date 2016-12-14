@@ -19,7 +19,7 @@
 #include <trousers/trousers.h>
 
 #define DBG(message, tResult) printf("Line%d, %s)%s returned 0x%08x. %s.\n", __LINE__, __func__, message, tResult, (char *)Trspi_Error_String(tResult))
-#define BUFFERSIZE 2000
+#define BUFFERSIZE 2048
 
 union semun  
 {  
@@ -201,7 +201,7 @@ void main(int argc, char **argv){
             exit(EXIT_FAILURE);  
         }  
 	//-----------------------------
-	char *inputFilePath = "/home/yg115/test/testForSysdig/trace.scap71";
+	char *inputFilePath = "/home/yg115/Downloads";
 	char outputFilePath[80];	//output file path for the content in buffer, the new
 							//file will be created and the fileNum will be added at the back
 	char outputFilePath1[80];
