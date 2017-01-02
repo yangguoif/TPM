@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <regex.h>
 #include <sys/sem.h> 
+#include <time.h>
 
 #include <bson.h>
 #include <bcon.h>
@@ -302,8 +303,10 @@ int main(int argc, char **argv)
 	const size_t nmatch = 1;
 	regex_t reg;
 	const char * pattern = "\\Value\" : \"([0-9]|[a-z])+";
-
+	int roundNum = 0;
 	while(1){
+		double tstart = clock();
+		roundNum++;
 		resetPCR(hContext, 16);
 		fileCount = 0;
 		char** fileNameArray = getFileNameArray(path, &fileCount);
@@ -419,7 +422,10 @@ int main(int argc, char **argv)
 		}else{
 			printf("No file is changed\n");
 		}
-		sleep(3);
+		double tend = clock();
+		double tcost = (double) (tend - tstart)/CLOCKS_PER_SEC;
+		printf("Round: %d, Time spent for this round : %f\n", roundNum, tcost);
+		sleep(2);
 	}
 
 	mongoc_collection_destroy (collection);

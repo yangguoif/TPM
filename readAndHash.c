@@ -19,7 +19,7 @@
 #include <trousers/trousers.h>
 
 #define DBG(message, tResult) printf("Line%d, %s)%s returned 0x%08x. %s.\n", __LINE__, __func__, message, tResult, (char *)Trspi_Error_String(tResult))
-#define BUFFERSIZE 2048
+#define BUFFERSIZE 1048576
 
 union semun  
 {  
